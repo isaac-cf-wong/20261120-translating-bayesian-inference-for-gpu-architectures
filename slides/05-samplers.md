@@ -115,6 +115,7 @@ the menu through the three modes. Grey is idle device time.
 <div data-fig="gf-eta"></div>
 <div>
 <div class="math-block">$$\eta(B) = \frac{\mathbb{E}[L]}{\mathbb{E}\big[\max_{b\le B} L_b\big]}$$</div>
+<p>\(L_b\): gradient evaluations in chain \(b\)'s trajectory this iteration; \(B\) chains run in lockstep.</p>
 <ul>
 <li>NUTS-like lengths: <em>η</em> falls to <strong>≈ 0.11</strong> (14.1 / 127). Adding chains makes it worse.</li>
 <li><strong>Fix the length</strong>: every chain takes the same number of leapfrog steps, tuned from statistics pooled across all chains.</li>
