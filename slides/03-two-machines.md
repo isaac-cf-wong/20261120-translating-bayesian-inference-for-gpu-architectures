@@ -82,9 +82,11 @@ prediction; the GPU answer, next part, is different.
 
 ## Peak speed is a product of widths
 
+<div class="math-block">
 $$
-\text{peak FLOP/s} = \text{cores} \times \text{clock} \times \text{SIMD width} \times 2_{\,\text{FMA}} \times \text{units}
+\text{peak FLOP/s} = \text{cores} \times \text{clock} \times \text{SIMD width} \times 2_{\text{FMA}} \times \text{units}
 $$
+</div>
 
 <table class="compact">
 <thead><tr><th></th><th>FP64 peak</th><th>FP32 peak</th><th>Memory bandwidth</th></tr></thead>

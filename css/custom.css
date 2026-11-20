@@ -212,12 +212,14 @@ body {
 
 .metric {
     border-left: 6px solid var(--cyan);
+    margin-top: 0.8em;
     padding-left: 16px;
+    font-size: 0.55em;
 }
 
 .metric strong {
     color: var(--blue);
-    font-size: 1.5em;
+    font-size: 1.3em;
 }
 
 /* ===== Math helpers ===== */
