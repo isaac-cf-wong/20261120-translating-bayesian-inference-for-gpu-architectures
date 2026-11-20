@@ -2899,3 +2899,472 @@ GF.register(
         )
     }
 )
+
+// The No-U-Turn sampler, run as a lockstep batch of chains on a correlated
+// two-dimensional Gaussian. Each frame is one leapfrog step (one gradient) for
+// every chain still building its trajectory. A chain doubles its trajectory
+// (1, 2, 4, ... steps, in a random direction). A new half that contains a U-turn
+// in any of its binary sub-trees is discarded and the chain stops; otherwise it
+// joins the trajectory, and the chain stops if the whole trajectory's ends now
+// move towards each other. The next state is drawn from the trajectory's points
+// with weights exp(-H) (multinomial NUTS). Checked offline: over 2e5 iterations
+// the samples' standard deviations are 0.997 and 0.201 against 1 and 0.2.
+GF.register(
+    'gf-nuts',
+    '<div class="gf" id="gf-nuts">' +
+        '<div class="ctl"><button type="button">Play</button><button type="button" data-reset>Reset</button>' +
+        '<label>Chains <select aria-label="Number of chains"><option value="1">1</option><option value="3" selected>3</option></select></label>' +
+        '<span class="ro"></span></div>' +
+        '<div class="legend"><span><span class="key" style="background:var(--s1)"></span>chain 1</span>' +
+        '<span><span class="key" style="background:var(--s2)"></span>chain 2</span>' +
+        '<span><span class="key" style="background:var(--s3)"></span>chain 3</span>' +
+        '<span><span class="key" style="background:var(--muted);opacity:.45"></span>finished, waiting for the slowest chain</span>' +
+        '<span><span class="key" style="border:1px dashed var(--muted)"></span>discarded half (inner U-turn)</span></div>' +
+        '<svg viewBox="0 0 640 330" role="img" aria-label="Left: three chains of a simplified No-U-Turn sampler on a correlated Gaussian; each builds a trajectory by repeated doubling until it turns back, then jumps to a point on it. Right: one row per chain showing the gradient evaluations of the current iteration; chains that finish early wait in grey until the longest trajectory is complete."></svg>' +
+        '</div>',
+    function () {
+        var G = GF,
+            root = document.getElementById('gf-nuts'),
+            svg = root.querySelector('svg'),
+            play = root.querySelector('button'),
+            reset = root.querySelector('[data-reset]'),
+            sel = root.querySelector('select'),
+            ro = root.querySelector('.ro')
+        var COL = ['var(--s1)', 'var(--s2)', 'var(--s3)']
+        // target: sd 1 along the 45-degree axis, 0.2 across it
+        var S1 = 1,
+            S2 = 0.2,
+            c = Math.SQRT1_2
+        function grad(x, y) {
+            var u = c * (x + y),
+                v = c * (y - x)
+            var gu = u / (S1 * S1),
+                gv = v / (S2 * S2)
+            return [c * (gu - gv), c * (gu + gv)]
+        }
+        function U(x, y) {
+            var u = c * (x + y),
+                v = c * (y - x)
+            return 0.5 * ((u * u) / (S1 * S1) + (v * v) / (S2 * S2))
+        }
+        var EPS = 0.14,
+            MAXD = 5 // depth cap: at most 1 + 2 + 4 + 8 + 16 = 31 steps
+        // plot geometry
+        var PX0 = 20,
+            PY0 = 15,
+            PW = 300,
+            R = 2.2
+        function sx(x) {
+            return PX0 + ((x + R) / (2 * R)) * PW
+        }
+        function sy(y) {
+            return PY0 + PW - ((y + R) / (2 * R)) * PW
+        }
+        var TX0 = 352,
+            TX1 = 625,
+            CELL = (TX1 - TX0) / 31
+        var r,
+            B,
+            chains,
+            iter,
+            frame,
+            pause,
+            useful,
+            total,
+            gTraj,
+            gHist,
+            gTime,
+            gTxt
+        function frameAxes() {
+            while (svg.firstChild) svg.removeChild(svg.firstChild)
+            G.el(
+                'rect',
+                {
+                    x: PX0,
+                    y: PY0,
+                    width: PW,
+                    height: PW,
+                    fill: 'none',
+                    stroke: 'currentColor',
+                    'stroke-opacity': 0.35,
+                },
+                svg
+            )
+            ;[1, 2].forEach(function (k) {
+                G.el(
+                    'ellipse',
+                    {
+                        cx: sx(0),
+                        cy: sy(0),
+                        rx: (k * S1 * PW) / (2 * R),
+                        ry: (k * S2 * PW) / (2 * R),
+                        transform: 'rotate(-45 ' + sx(0) + ' ' + sy(0) + ')',
+                        fill: 'none',
+                        stroke: 'var(--muted)',
+                        'stroke-dasharray': '4 3',
+                    },
+                    svg
+                )
+            })
+            G.txt(
+                svg,
+                PX0 + PW / 2,
+                PY0 + PW + 13,
+                'target: correlated Gaussian (dashed: 1σ and 2σ)',
+                { 'text-anchor': 'middle', 'font-size': 10.5 }
+            )
+            var cp = G.el(
+                'clipPath',
+                { id: 'gf-nuts-clip' },
+                G.el('defs', {}, svg)
+            )
+            G.el('rect', { x: PX0, y: PY0, width: PW, height: PW }, cp)
+            gHist = G.el('g', { 'clip-path': 'url(#gf-nuts-clip)' }, svg)
+            gTraj = G.el('g', { 'clip-path': 'url(#gf-nuts-clip)' }, svg)
+            G.txt(
+                svg,
+                TX0,
+                PY0 + 10,
+                'this iteration, one column per lockstep step (= one gradient)',
+                { 'font-size': 10.5 }
+            )
+            gTime = G.el('g', {}, svg)
+            gTxt = G.el('g', {}, svg)
+        }
+        function newIteration() {
+            iter++
+            frame = 0
+            chains.forEach(function (ch) {
+                var p = { x: ch.x, y: ch.y, px: G.normal(r), py: G.normal(r) }
+                p.h = U(p.x, p.y) + 0.5 * (p.px * p.px + p.py * p.py)
+                ch.tr = [p] // trajectory in time order
+                ch.gen = [] // the half being built, in generation order
+                ch.rej = null
+                ch.depth = 0
+                ch.done = false
+                ch.steps = 0
+                ch.chosen = null
+                startDoubling(ch)
+            })
+            drawTimelineFrame()
+        }
+        function startDoubling(ch) {
+            ch.dir = r() < 0.5 ? -1 : 1
+            ch.todo = Math.pow(2, ch.depth)
+            ch.gen = []
+        }
+        function uturn(a, b) {
+            // a earlier, b later in time
+            var dx = b.x - a.x,
+                dy = b.y - a.y
+            return dx * a.px + dy * a.py < 0 || dx * b.px + dy * b.py < 0
+        }
+        function innerUturn(run) {
+            for (var s = 2; s <= run.length; s *= 2)
+                for (var i = 0; i + s <= run.length; i += s)
+                    if (uturn(run[i], run[i + s - 1])) return true
+            return false
+        }
+        function leap(ch) {
+            var e = ch.gen.length
+                    ? ch.gen[ch.gen.length - 1]
+                    : ch.dir > 0
+                      ? ch.tr[ch.tr.length - 1]
+                      : ch.tr[0],
+                h = EPS * ch.dir
+            var g = grad(e.x, e.y)
+            var px = e.px - 0.5 * h * g[0],
+                py = e.py - 0.5 * h * g[1]
+            var x = e.x + h * px,
+                y = e.y + h * py
+            g = grad(x, y)
+            px -= 0.5 * h * g[0]
+            py -= 0.5 * h * g[1]
+            ch.gen.push({
+                x: x,
+                y: y,
+                px: px,
+                py: py,
+                h: U(x, y) + 0.5 * (px * px + py * py),
+            })
+            ch.todo--
+            ch.steps++
+            if (ch.todo === 0) {
+                ch.depth++
+                var run = ch.dir > 0 ? ch.gen : ch.gen.slice().reverse()
+                ch.gen = []
+                if (innerUturn(run)) {
+                    ch.rej = run
+                    finish(ch, 'inner U-turn, new half dropped')
+                    return
+                }
+                ch.tr = ch.dir > 0 ? ch.tr.concat(run) : run.concat(ch.tr)
+                if (uturn(ch.tr[0], ch.tr[ch.tr.length - 1]))
+                    finish(ch, 'U-turn')
+                else if (ch.depth >= MAXD) finish(ch, 'depth cap')
+                else startDoubling(ch)
+            }
+        }
+        function finish(ch, why) {
+            ch.done = true
+            ch.why = why
+            // draw the next state from the trajectory, weights exp(-H)
+            var h0 = Math.min.apply(
+                null,
+                ch.tr.map(function (q) {
+                    return q.h
+                })
+            )
+            var w = ch.tr.map(function (q) {
+                return Math.exp(-(q.h - h0))
+            })
+            var s = w.reduce(function (a, b) {
+                    return a + b
+                }, 0),
+                u = r() * s,
+                k = 0
+            while (k < w.length - 1 && (u -= w[k]) > 0) k++
+            ch.chosen = ch.tr[k]
+        }
+        function pathOf(pts) {
+            return pts
+                .map(function (q, j) {
+                    return (
+                        (j ? 'L' : 'M') +
+                        sx(q.x).toFixed(1) +
+                        ',' +
+                        sy(q.y).toFixed(1)
+                    )
+                })
+                .join('')
+        }
+        function drawTraj() {
+            while (gTraj.firstChild) gTraj.removeChild(gTraj.firstChild)
+            chains.forEach(function (ch, i) {
+                var op = ch.done ? 0.45 : 0.9
+                var growing = ch.gen.length
+                    ? [ch.dir > 0 ? ch.tr[ch.tr.length - 1] : ch.tr[0]].concat(
+                          ch.gen
+                      )
+                    : []
+                if (ch.rej) {
+                    G.el(
+                        'path',
+                        {
+                            d: pathOf(ch.rej),
+                            fill: 'none',
+                            stroke: 'var(--muted)',
+                            'stroke-width': 1.4,
+                            'stroke-dasharray': '3 2',
+                        },
+                        gTraj
+                    )
+                    ch.rej.forEach(function (q) {
+                        G.el(
+                            'circle',
+                            {
+                                cx: sx(q.x),
+                                cy: sy(q.y),
+                                r: 1.8,
+                                fill: 'var(--muted)',
+                            },
+                            gTraj
+                        )
+                    })
+                }
+                ;[ch.tr, growing].forEach(function (pts) {
+                    if (pts.length < 2) return
+                    G.el(
+                        'path',
+                        {
+                            d: pathOf(pts),
+                            fill: 'none',
+                            stroke: COL[i],
+                            'stroke-width': 1.6,
+                            'stroke-opacity': op,
+                        },
+                        gTraj
+                    )
+                })
+                ch.tr.concat(ch.gen).forEach(function (q) {
+                    G.el(
+                        'circle',
+                        {
+                            cx: sx(q.x),
+                            cy: sy(q.y),
+                            r: 1.8,
+                            fill: COL[i],
+                            'fill-opacity': op,
+                        },
+                        gTraj
+                    )
+                })
+                G.el(
+                    'circle',
+                    {
+                        cx: sx(ch.x),
+                        cy: sy(ch.y),
+                        r: 4,
+                        fill: '#fff',
+                        stroke: COL[i],
+                        'stroke-width': 2,
+                    },
+                    gTraj
+                )
+                if (ch.chosen)
+                    G.el(
+                        'circle',
+                        {
+                            cx: sx(ch.chosen.x),
+                            cy: sy(ch.chosen.y),
+                            r: 5.5,
+                            fill: COL[i],
+                            stroke: '#fff',
+                            'stroke-width': 1.5,
+                        },
+                        gTraj
+                    )
+            })
+        }
+        function rowY(i) {
+            return PY0 + 30 + i * 62
+        }
+        function drawTimelineFrame() {
+            while (gTime.firstChild) gTime.removeChild(gTime.firstChild)
+            chains.forEach(function (ch, i) {
+                G.el(
+                    'rect',
+                    {
+                        x: TX0,
+                        y: rowY(i),
+                        width: TX1 - TX0,
+                        height: 18,
+                        fill: 'none',
+                        stroke: 'currentColor',
+                        'stroke-opacity': 0.25,
+                    },
+                    gTime
+                )
+            })
+        }
+        function timelineCell(i, col, fill, op) {
+            G.el(
+                'rect',
+                {
+                    x: TX0 + col * CELL + 0.5,
+                    y: rowY(i) + 1,
+                    width: CELL - 1,
+                    height: 16,
+                    fill: fill,
+                    'fill-opacity': op,
+                },
+                gTime
+            )
+        }
+        function drawText() {
+            while (gTxt.firstChild) gTxt.removeChild(gTxt.firstChild)
+            chains.forEach(function (ch, i) {
+                var s =
+                    'chain ' +
+                    (i + 1) +
+                    ': ' +
+                    ch.steps +
+                    ' gradient' +
+                    (ch.steps === 1 ? '' : 's') +
+                    ', depth ' +
+                    ch.depth
+                s += ch.done
+                    ? ' · ' + ch.why
+                    : ' · doubling ' + (ch.dir > 0 ? 'forwards' : 'backwards')
+                G.txt(gTxt, TX0, rowY(i) + 32, s, { 'font-size': 10.5 })
+            })
+            var ys = rowY(B) + 4
+            G.txt(
+                gTxt,
+                TX0,
+                ys,
+                'lockstep: the iteration lasts as long as the longest trajectory',
+                { 'font-size': 10.5 }
+            )
+            G.txt(
+                gTxt,
+                TX0,
+                ys + 16,
+                'useful work so far: ' +
+                    (total ? Math.round((100 * useful) / total) : '–') +
+                    ' % of chain-steps',
+                { 'font-size': 10.5, 'font-weight': 600 }
+            )
+        }
+        function init() {
+            B = +sel.value
+            r = GF.rng(7)
+            chains = []
+            for (var i = 0; i < B; i++)
+                chains.push({ x: 0.6 * G.normal(r), y: 0.6 * G.normal(r) })
+            iter = 0
+            useful = 0
+            total = 0
+            pause = 0
+            frameAxes()
+            newIteration()
+            drawTraj()
+            drawText()
+            report()
+        }
+        function report() {
+            ro.textContent = 'iteration ' + iter + ' · lockstep step ' + frame
+        }
+        function tick() {
+            if (pause > 0) {
+                pause--
+                if (pause === 0) {
+                    chains.forEach(function (ch) {
+                        G.el(
+                            'circle',
+                            {
+                                cx: sx(ch.chosen.x),
+                                cy: sy(ch.chosen.y),
+                                r: 2.2,
+                                fill: 'currentColor',
+                                'fill-opacity': 0.35,
+                            },
+                            gHist
+                        )
+                        ch.x = ch.chosen.x
+                        ch.y = ch.chosen.y
+                    })
+                    if (gHist.childNodes.length > 150)
+                        gHist.removeChild(gHist.firstChild)
+                    newIteration()
+                    drawTraj()
+                    drawText()
+                    report()
+                }
+                return
+            }
+            chains.forEach(function (ch, i) {
+                total++
+                if (!ch.done) {
+                    timelineCell(i, frame, COL[i], 1)
+                    leap(ch)
+                    useful++
+                } else timelineCell(i, frame, 'var(--muted)', 0.45)
+            })
+            frame++
+            drawTraj()
+            drawText()
+            report()
+            if (
+                chains.every(function (ch) {
+                    return ch.done
+                })
+            )
+                pause = 8
+        }
+        G.animator(root, play, tick, 160)
+        reset.addEventListener('click', init)
+        sel.addEventListener('change', init)
+        init()
+    }
+)

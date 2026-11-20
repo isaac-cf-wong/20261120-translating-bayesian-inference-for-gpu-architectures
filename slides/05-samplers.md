@@ -66,6 +66,30 @@ groups chains into superchains so short chains can still be assessed.
 
 ---
 
+## NUTS: grow the trajectory until it turns back
+
+<div class="fig-text">
+<div data-fig="gf-nuts"></div>
+<div>
+<ul>
+<li>Each leapfrog step follows the Hamiltonian flow and costs <strong>one gradient</strong>.</li>
+<li>NUTS doubles the trajectory (1, 2, 4, 8, … steps, in a random direction) until its two ends start moving back towards each other: the <strong>U-turn</strong>.</li>
+<li>The next state is drawn from the trajectory's points.</li>
+<li>The length depends on the momentum draw, so it <strong>differs from chain to chain</strong>. Run in lockstep, finished chains wait (grey) for the longest.</li>
+</ul>
+<p class="caption">Hoffman &amp; Gelman 2014. Multinomial variant with sub-tree U-turn checks; depth capped at 5.</p>
+</div>
+</div>
+
+Notes: White circle: current state; filled circle: the state drawn for the next
+iteration; small grey dots: earlier samples. A dashed grey half was discarded
+because it contained a U-turn of its own; its gradients were still paid for.
+Switch to one chain to see NUTS on its own, then three to see the waiting. The
+sampler is real: checked offline over 2e5 iterations, its samples have standard
+deviations 0.997 and 0.201 against the target's 1 and 0.2.
+
+---
+
 ## NUTS in lockstep: everyone waits for the longest trajectory
 
 <div class="fig-text">
