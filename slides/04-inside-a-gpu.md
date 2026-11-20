@@ -92,9 +92,9 @@ member of the batch.
 <div data-fig="gf-coal"></div>
 <div>
 <ul>
-<li>A warp's 32 loads are served in <strong>32-byte sectors</strong>.</li>
-<li>Thread <em>i</em> reads element <em>i</em>: every byte fetched is used (100%).</li>
-<li>Stride or scatter: up to 4× the traffic for the same data.</li>
+<li>Memory cannot deliver less than a <strong>32-byte sector</strong> (4 doubles): any sector holding a requested element is fetched whole.</li>
+<li>Thread <em>t</em> reads element <em>t</em>: 8 sectors, every byte used.</li>
+<li>Stride 2: half of every sector is thrown away. Stride ≥ 4 or scattered: three quarters, 4× the traffic.</li>
 <li>Arrays laid out with the batch axis contiguous ("structure of arrays") keep loads coalesced.</li>
 </ul>
 <p class="caption">CUDA Programming Guide.</p>

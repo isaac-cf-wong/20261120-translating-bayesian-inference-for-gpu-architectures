@@ -909,7 +909,7 @@ GF.register(
 
 GF.register(
     'gf-coal',
-    '<div class="gf" id="gf-coal">\n<div class="ctl"><label>Access pattern <select aria-label="Memory access pattern"><option value="1" selected>thread i reads element i</option><option value="2">stride 2</option><option value="4">stride 4</option><option value="32">stride 32</option><option value="rand">scattered</option></select></label><span class="ro"></span></div>\n<div class="legend"><span><span class="key" style="background:var(--s1)"></span>thread of the warp</span><span><span class="key" style="background:var(--s2)"></span>32-byte sector the warp must fetch</span></div>\n<svg viewBox="0 0 640 220" role="img" aria-label="The 32 threads of a warp at the top, each joined by a line to the double-precision element it reads in device memory at the bottom. Consecutive access touches eight sectors; strided or scattered access touches up to thirty-two."></svg>\n</div>',
+    '<div class="gf" id="gf-coal">\n<div class="ctl"><label>Access pattern <select aria-label="Memory access pattern"><option value="1" selected>thread t reads element t</option><option value="2">stride 2</option><option value="4">stride 4</option><option value="32">stride 32</option><option value="rand">scattered</option></select></label><span class="ro"></span></div>\n<div class="legend"><span><span class="key" style="background:var(--s1)"></span>element a thread asked for (thread number)</span><span><span class="key" style="background:var(--s2);opacity:.25"></span>fetched with its sector, never used</span><span><span class="key" style="border:1px solid currentColor"></span>one 32-byte sector</span></div>\n<svg viewBox="0 0 640 250" role="img" aria-label="The 32 threads of a warp, and below them the 32-byte sectors the warp must fetch, each drawn as its four double-precision elements. With consecutive access eight sectors are fetched and every element is used; at stride 2, sixteen sectors with half of each unused; from stride 4 upwards, thirty-two sectors with three quarters of each unused."></svg>\n</div>',
     function () {
         ;(function () {
             var G = GF,
@@ -917,115 +917,148 @@ GF.register(
                 svg = root.querySelector('svg'),
                 sel = root.querySelector('select'),
                 ro = root.querySelector('.ro')
-            var X0 = 20,
-                X1 = 620,
-                YT = 30,
-                YM = 150
+            // One 32-byte sector holds 4 doubles. The memory system fetches whole sectors,
+            // so every sector containing a requested element is moved in full.
+            var PER = 4,
+                X0 = 20,
+                CW = 15,
+                SG = 14,
+                SW = PER * CW,
+                COLS = 8,
+                YT = 28,
+                YM = 100,
+                RH = 38
             function draw() {
                 while (svg.firstChild) svg.removeChild(svg.firstChild)
                 var v = sel.value,
-                    addr = [],
-                    r = GF.rng(9)
+                    r = GF.rng(9),
+                    addr = []
                 for (var t = 0; t < 32; t++)
                     addr.push(v === 'rand' ? Math.floor(r() * 1024) : t * +v)
-                var maxA = v === 'rand' ? 1024 : Math.max(32, 32 * +v),
-                    ew = (X1 - X0) / maxA // elements across the strip
-                var sectors = {}
-                addr.forEach(function (a) {
-                    sectors[Math.floor(a / 4)] = true
+                var owner = {}
+                addr.forEach(function (a, t) {
+                    owner[a] = t
                 })
-                var ns = Object.keys(sectors).length
+                var secs = Object.keys(
+                    addr.reduce(function (o, a) {
+                        o[Math.floor(a / PER)] = 1
+                        return o
+                    }, {})
+                )
+                    .map(Number)
+                    .sort(function (a, b) {
+                        return a - b
+                    })
+                // the warp
                 G.txt(
                     svg,
                     X0,
-                    18,
-                    'one warp: 32 threads, each loading one double (8 bytes)',
+                    14,
+                    'one warp: 32 threads, thread t loads one double (8 B) from element ' +
+                        (v === 'rand'
+                            ? 'chosen at random'
+                            : v === '1'
+                              ? 't'
+                              : v + '·t'),
                     { 'font-size': 11 }
                 )
-                for (var t2 = 0; t2 < 32; t2++)
+                for (var t2 = 0; t2 < 32; t2++) {
                     G.el(
                         'rect',
                         {
-                            x: X0 + t2 * 18.75 + 2,
+                            x: X0 + t2 * 18.75,
                             y: YT,
-                            width: 14,
-                            height: 14,
+                            width: 15,
+                            height: 15,
                             rx: 2,
                             fill: 'var(--s1)',
                         },
                         svg
                     )
-                G.el(
-                    'rect',
-                    {
-                        x: X0,
-                        y: YM,
-                        width: X1 - X0,
-                        height: 24,
-                        fill: 'none',
-                        stroke: 'currentColor',
-                        'stroke-opacity': 0.4,
-                    },
-                    svg
+                    G.txt(svg, X0 + t2 * 18.75 + 7.5, YT + 11, String(t2), {
+                        'text-anchor': 'middle',
+                        'font-size': 8,
+                        fill: '#fff',
+                    })
+                }
+                G.txt(
+                    svg,
+                    X0,
+                    YM - 14,
+                    'the ' +
+                        secs.length +
+                        ' sectors this warp must fetch, in address order (each 32 B = 4 doubles; ⋯ = memory skipped, not fetched)',
+                    { 'font-size': 11 }
                 )
-                Object.keys(sectors).forEach(function (s) {
+                var used = 0
+                secs.forEach(function (s, i) {
+                    var col = i % COLS,
+                        row = Math.floor(i / COLS),
+                        x = X0 + col * (SW + SG),
+                        y = YM + row * RH
+                    if (i > 0 && s !== secs[i - 1] + 1)
+                        G.txt(svg, x - SG / 2, y + 15, '⋯', {
+                            'text-anchor': 'middle',
+                            'font-size': 12,
+                        })
                     G.el(
                         'rect',
                         {
-                            x: X0 + +s * 4 * ew,
-                            y: YM,
-                            width: Math.max(4 * ew, 1.5),
+                            x: x - 1,
+                            y: y - 1,
+                            width: SW + 2,
                             height: 24,
-                            fill: 'var(--s2)',
-                            'fill-opacity': 0.8,
+                            rx: 3,
+                            fill: 'none',
+                            stroke: 'currentColor',
+                            'stroke-opacity': 0.55,
                         },
                         svg
                     )
+                    for (var k = 0; k < PER; k++) {
+                        var a = s * PER + k,
+                            hit = owner.hasOwnProperty(a)
+                        if (hit) used++
+                        G.el(
+                            'rect',
+                            {
+                                x: x + k * CW + 0.5,
+                                y: y,
+                                width: CW - 1,
+                                height: 22,
+                                rx: 1.5,
+                                fill: hit ? 'var(--s1)' : 'var(--s2)',
+                                'fill-opacity': hit ? 1 : 0.25,
+                            },
+                            svg
+                        )
+                        if (hit)
+                            G.txt(
+                                svg,
+                                x + k * CW + CW / 2,
+                                y + 15,
+                                String(owner[a]),
+                                {
+                                    'text-anchor': 'middle',
+                                    'font-size': 8,
+                                    fill: '#fff',
+                                }
+                            )
+                    }
                 })
-                addr.forEach(function (a, t3) {
-                    G.el(
-                        'line',
-                        {
-                            x1: X0 + t3 * 18.75 + 9,
-                            y1: YT + 14,
-                            x2: X0 + (a + 0.5) * ew,
-                            y2: YM,
-                            stroke: 'var(--s1)',
-                            'stroke-opacity': 0.5,
-                        },
-                        svg
-                    )
-                })
-                G.txt(
-                    svg,
-                    X0,
-                    YM + 40,
-                    'device memory: elements 0 … ' +
-                        (maxA - 1) +
-                        ' (' +
-                        8 * maxA +
-                        ' bytes shown)',
-                    { 'font-size': 11 }
-                )
-                G.txt(
-                    svg,
-                    X0,
-                    YM + 58,
-                    'sectors fetched: ' +
-                        ns +
-                        ' × 32 B = ' +
-                        32 * ns +
-                        ' B for 256 B of useful data',
-                    { 'font-size': 11 }
-                )
+                var fetched = secs.length * 32,
+                    eff = 256 / fetched
                 ro.textContent =
-                    'efficiency ' +
-                    ((100 * 256) / (32 * ns)).toFixed(0) +
-                    ' % (' +
-                    ns +
-                    ' sector' +
-                    (ns > 1 ? 's' : '') +
-                    ')'
+                    'fetched ' +
+                    secs.length +
+                    ' × 32 B = ' +
+                    fetched +
+                    ' B for 256 B requested · ' +
+                    Math.round(100 * eff) +
+                    ' % of the traffic is useful' +
+                    (eff < 1
+                        ? ' (' + (1 / eff).toFixed(0) + '× the minimum)'
+                        : '')
             }
             sel.addEventListener('change', draw)
             draw()
