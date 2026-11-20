@@ -3,6 +3,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-yellow.svg)](./LICENSE)
 [![Reveal.js](https://img.shields.io/badge/reveal.js-6.x-orange.svg)](https://revealjs.com/)
 [![CI](https://github.com/isaac-cf-wong/20261120-translating-bayesian-inference-for-gpu-architectures/actions/workflows/ci.yml/badge.svg)](https://github.com/isaac-cf-wong/20261120-translating-bayesian-inference-for-gpu-architectures/actions/workflows/ci.yml)
+[![Publish](https://github.com/isaac-cf-wong/20261120-translating-bayesian-inference-for-gpu-architectures/actions/workflows/publish.yml/badge.svg)](https://github.com/isaac-cf-wong/20261120-translating-bayesian-inference-for-gpu-architectures/actions/workflows/publish.yml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![typos](https://img.shields.io/badge/spell--check-typos-brightgreen)](https://github.com/crate-ci/typos)
 
@@ -35,7 +36,9 @@ precision and reproducibility.
 
 ## Viewing the slides
 
-Requires Node.js 18 or later and npm.
+The slides are online at
+<https://isaac-cf-wong.com/20261120-translating-bayesian-inference-for-gpu-architectures/>.
+To run them locally instead, you need Node.js 18 or later and npm.
 
 ```console
 npm ci
