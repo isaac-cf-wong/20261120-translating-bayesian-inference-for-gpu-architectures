@@ -117,7 +117,7 @@ the menu through the three modes. Grey is idle device time.
 <div class="math-block">$$\eta(B) = \frac{\mathbb{E}[L]}{\mathbb{E}\big[\max_{b\le B} L_b\big]}$$</div>
 <ul>
 <li>NUTS-like lengths: <em>η</em> falls to <strong>≈ 0.11</strong> (14.1 / 127). Adding chains makes it worse.</li>
-<li><strong>Fix the length</strong>, tuned across chains: ChEES, SNAPER, MEADS.</li>
+<li><strong>Fix the length</strong>: every chain takes the same number of leapfrog steps, tuned from statistics pooled across all chains.</li>
 <li><strong>Stop waiting</strong>: rewrite NUTS as a finite-state machine; up to ~10× over naive vectorisation on the same accelerator.</li>
 </ul>
 <p class="caption">Hoffman+ 2021; Sountsov &amp; Hoffman 2021; Hoffman &amp; Sountsov 2022; Dance+ 2025.</p>
@@ -127,7 +127,13 @@ the menu through the three modes. Grey is idle device time.
 Notes: Model in the figure: tree depth 1 + Binomial(6, 0.4), L = 2^d - 1, mean
 14.1. With exponential lengths eta is 1/H_B, about 0.13 at B = 1000. The fixes
 illustrate the main lesson of the talk: you translate the algorithm, not just
-the code. Cross-chain adaptation exists because many chains are now cheap.
+the code. Cross-chain adaptation exists because many chains are now cheap. If
+asked, the fixed-length methods in the caption are ChEES (Hoffman et al. 2021),
+which picks one trajectory length for all chains by maximising a cross-chain
+measure of how far the chains move per step; SNAPER (Sountsov and Hoffman 2021),
+which tunes that length for the target's slowest-mixing direction; and MEADS
+(Hoffman and Sountsov 2022), a tuning-free variant of generalised HMC that also
+adapts from cross-chain statistics.
 
 ---
 
