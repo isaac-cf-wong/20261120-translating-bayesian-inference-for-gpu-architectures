@@ -56,7 +56,7 @@ body {
     margin-bottom: 0.65em;
     border-bottom: 4px solid var(--gold);
     padding-bottom: 0.18em;
-    font-size: 1.34em;
+    font-size: 1.02em;
 }
 
 .reveal h3 {
@@ -133,6 +133,7 @@ body {
 
 .reveal pre code {
     background-color: var(--code-background);
+    color: #f8f8f2;
     padding: 1em;
     border-radius: 8px;
     font-size: 0.7em;
@@ -349,4 +350,155 @@ body {
         opacity: 1 !important;
         visibility: visible !important;
     }
+}
+
+/* ===== Interactive figures (js/figures.js) ===== */
+
+.gf {
+    --s1: #2a78d6;
+    --s2: #eb6834;
+    --s3: #1baf7a;
+    --muted: #8a8984;
+    --grid: rgb(127 127 127 / 28%);
+
+    position: relative;
+    color: var(--ink);
+    font-size: 18px;
+    text-align: left;
+}
+
+.gf svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 470px;
+    overflow: visible;
+    color: inherit;
+    font-family: inherit;
+}
+
+.gf .ctl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    align-items: center;
+    margin: 2px 0 6px;
+    font-size: 17px;
+}
+
+.gf .ctl label {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.gf button,
+.gf select {
+    border: 1px solid currentcolor;
+    border-radius: 4px;
+    padding: 2px 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.gf .ro {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.85;
+}
+
+.gf .key {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.3em;
+    border-radius: 2px;
+    vertical-align: -0.05em;
+}
+
+.gf .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin: 2px 0;
+    font-size: 16px;
+}
+
+.gf .tip {
+    display: none;
+    position: absolute;
+    z-index: 5;
+    border: 1px solid var(--grid);
+    border-radius: 4px;
+    padding: 4px 8px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 15%);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Figure beside a column of text */
+
+.fig-text {
+    display: grid;
+    grid-template-columns: 1.85fr 1fr;
+    gap: 26px;
+    align-items: start;
+}
+
+.reveal .fig-text li,
+.reveal .fig-text p {
+    font-size: 0.47em;
+}
+
+.reveal .fig-text .caption {
+    font-size: 0.38em !important;
+}
+
+.reveal .fig-text .takeaway {
+    font-size: 0.47em;
+}
+
+.reveal .fig-text .math-block {
+    margin: 0 0 0.3em;
+    font-size: 0.62em !important;
+}
+
+.fig-text .gf svg {
+    max-height: 430px;
+}
+
+/* Wide figure with a one-line note underneath */
+
+.fig-wide .gf svg {
+    max-height: 420px;
+}
+
+.reveal .small li,
+.reveal .small p {
+    font-size: 0.5em;
+}
+
+.reveal .refs li {
+    margin-bottom: 0.15em;
+    font-size: 0.36em;
+    line-height: 1.25;
+}
+
+.reveal .cite {
+    color: var(--muted);
+    font-size: 0.7em;
+}
+
+.reveal table.compact {
+    font-size: 0.48em;
+}
+
+.reveal .section-title h2 {
+    border-bottom: none;
 }

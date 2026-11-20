@@ -1,11 +1,13 @@
-<p class="eyebrow">Venue · Session · Date</p>
+<p class="eyebrow">Journal club · 20 November 2026</p>
 
-# Presentation Template
+# Translating Bayesian Inference for GPU Architectures
 
-## A clean, light theme built with reveal.js
+## What makes a GPU fast, and what it asks of a sampler
 
-<p class="byline">Your Name</p>
-<p class="muted">Affiliation · Date</p>
+<p class="byline">Isaac C. F. Wong</p>
+<p class="muted">KU Leuven</p>
 
-Notes: Welcome to your presentation template. This is the title slide. You can
-add speaker notes here that won't be visible to the audience.
+Notes: About 30 minutes. The aim is not a survey of GPU samplers but a working
+mental model: why a GPU is fast, what it punishes, and how that explains the
+shape of the GPU samplers now appearing in GW inference. Several slides have
+live figures; sliders and menus can be used during the talk.
