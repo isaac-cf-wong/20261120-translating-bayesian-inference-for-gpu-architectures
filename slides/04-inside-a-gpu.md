@@ -45,7 +45,8 @@ consecutive threads should touch consecutive memory. Both come up next.
 <div>
 <ul>
 <li>Each warp: 4 instructions, then a load that takes 40 cycles.</li>
-<li>One warp: scheduler idle 90% of the time. About <strong>11 warps</strong>: some warp is always ready.</li>
+<li>One warp: scheduler idle ~90% of cycles.</li>
+<li>With <strong>≥ 11 warps</strong>, the other warps' work (10 × 4 cycles) covers one warp's 40-cycle wait, so the scheduler issues every cycle.</li>
 <li>Little's law: bytes in flight = bandwidth × latency ≈ 1.6 TB/s × 250 ns ≈ <strong>0.4 MB ≈ 5×10⁴ doubles</strong>.</li>
 </ul>
 <p class="takeaway">Massive parallelism is the <em>price of admission</em>: it is what keeps the memory system busy.</p>
