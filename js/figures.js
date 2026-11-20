@@ -698,10 +698,13 @@ GF.register(
                 )
             }
             function step() {
-                // round-robin from the warp after the last one issued
+                // greedy: keep issuing from the last warp until it stalls on its
+                // load, then move to the next ready warp. (Switching warps every
+                // cycle would make all warps reach their loads together and wait
+                // together, which hides far less latency.)
                 var pick = -1
-                for (var k = 1; k <= W; k++) {
-                    var w = (last + k) % W
+                for (var k = 0; k < W; k++) {
+                    var w = (Math.max(last, 0) + k) % W
                     if (readyAt[w] <= cyc) {
                         pick = w
                         break

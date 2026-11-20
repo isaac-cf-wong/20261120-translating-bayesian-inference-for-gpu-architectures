@@ -44,23 +44,24 @@ consecutive threads should touch consecutive memory. Both come up next.
 <div data-fig="gf-hide"></div>
 <div>
 <ul>
-<li>Each warp: 4 instructions, then a load that takes 40 cycles.</li>
-<li>One warp: scheduler idle ~90% of cycles.</li>
-<li>With <strong>≥ 11 warps</strong>, the other warps' work (10 × 4 cycles) covers one warp's 40-cycle wait, so the scheduler issues every cycle.</li>
+<li>Each warp: 4 instructions, then a load that takes 40 cycles. The scheduler runs one warp until it stalls, then the next.</li>
+<li>With <strong>≥ 11 warps</strong>, the other warps' work (10 × 4 cycles) covers one warp's 40-cycle wait: the bottom row has no gaps. At 10, a 4-cycle gap recurs every 44 cycles.</li>
 <li>Little's law: bytes in flight = bandwidth × latency ≈ 1.6 TB/s × 250 ns ≈ <strong>0.4 MB ≈ 5×10⁴ doubles</strong>.</li>
 </ul>
 <p class="takeaway">Massive parallelism is the <em>price of admission</em>: it is what keeps the memory system busy.</p>
 </div>
 </div>
 
-Notes: Drag the slider from 1 to 16. The 4-and-40 workload is a teaching model.
-Real global-memory latency is several hundred cycles (about 375 on a V100 by
-microbenchmark, Jia et al. 2018), about 250 ns at a 1.5 GHz clock. Times A100
-bandwidth gives the bytes that must be in flight. That is tens of thousands of
-independent loads. So the GPU is not fast because each lane is fast; it is fast
-because it can keep that many requests outstanding while the CPU hides latency
-with caches and prediction. Order of magnitude only: V100 latency combined with
-A100 bandwidth.
+Notes: Drag the slider from 1 to 16; compare 10 and 11 warps. The busy spells
+form a staircase; at 11 the first warp returns exactly as the eleventh finishes,
+so the scheduler row is solid. Beyond 11, extra warps wait their turn (grey).
+The 4-and-40 workload is a teaching model. Real global-memory latency is several
+hundred cycles (about 375 on a V100 by microbenchmark, Jia et al. 2018), about
+250 ns at a 1.5 GHz clock. Times A100 bandwidth gives the bytes that must be in
+flight. That is tens of thousands of independent loads. So the GPU is not fast
+because each lane is fast; it is fast because it can keep that many requests
+outstanding while the CPU hides latency with caches and prediction. Order of
+magnitude only: V100 latency combined with A100 bandwidth.
 
 ---
 
