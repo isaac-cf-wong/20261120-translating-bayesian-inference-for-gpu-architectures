@@ -38,6 +38,28 @@ a CPU.
 
 ---
 
+## Where the data lives
+
+<div class="fig-text">
+<div data-fig="gf-where"></div>
+<div>
+<ul>
+<li>Arithmetic reads only <strong>registers</strong>; every other number must first be copied inwards.</li>
+<li>Each step outwards is bigger and slower: L1 → L2 → shared L3, all on the chip.</li>
+<li>Leaving the chip is the big jump: DRAM ~90 ns ≈ 270 cycles.</li>
+<li>The GPU is <strong>another device</strong> with its own memory, behind PCI Express, as is the SSD.</li>
+</ul>
+</div>
+</div>
+
+Notes: Hover a part to see its access time on the human scale. Sizes are typical
+of recent server cores (tens of KB of L1, about 1 MB of L2 per core, tens of MB
+of shared L3); times are the same rounded values as on the next slide. Physical
+distance is not itself the cost: light crosses 10 cm in about 0.3 ns. The time
+goes into the DRAM access and the protocols on the way.
+
+---
+
 ## Arithmetic is cheap; fetching data is not
 
 <div class="fig-text">

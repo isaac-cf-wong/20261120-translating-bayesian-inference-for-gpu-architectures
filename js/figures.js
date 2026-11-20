@@ -2625,3 +2625,241 @@ GF.register(
         })()
     }
 )
+
+// Where the data lives: a schematic of one computer, with each level of the
+// memory hierarchy at its physical location. Latencies match the ladder figure
+// (gf-lat): rounded orders of magnitude for a 3 GHz core, not measurements.
+GF.register(
+    'gf-where',
+    '<div class="gf" id="gf-where">' +
+        '<div class="legend"><span><span class="key" style="background:var(--s1)"></span>inside the CPU chip</span>' +
+        '<span><span class="key" style="background:var(--s2)"></span>off the chip, across the board</span>' +
+        '<span>hover a part: its access time if one cycle lasted one second</span></div>' +
+        '<svg viewBox="0 0 640 330" role="img" aria-label="Schematic of a computer. Inside the CPU package, each core holds its arithmetic units, registers, an L1 and an L2 cache; an L3 cache is shared by all cores. Main memory sits on the board, reached over memory channels. A GPU card with its own memory and an SSD sit further away, reached over PCI Express. Each step outward is larger and slower."></svg>' +
+        '<div class="tip"></div></div>',
+    function () {
+        var G = GF,
+            root = document.getElementById('gf-where'),
+            svg = root.querySelector('svg'),
+            tip = root.querySelector('.tip')
+        var CYC = 0.33 // ns per cycle at 3 GHz, as in the ladder
+        function human(ns) {
+            var s = ns / CYC
+            if (s < 90) return Math.round(s) + ' s'
+            if (s < 5400) return Math.round(s / 60) + ' min'
+            if (s < 172800) return (s / 3600).toFixed(1) + ' h'
+            return (s / 86400).toFixed(1) + ' days'
+        }
+        function box(x, y, w, h, fill, op, a) {
+            return G.el(
+                'rect',
+                Object.assign(
+                    {
+                        x: x,
+                        y: y,
+                        width: w,
+                        height: h,
+                        rx: 4,
+                        fill: fill,
+                        'fill-opacity': op,
+                        stroke: 'currentColor',
+                        'stroke-opacity': 0.45,
+                    },
+                    a || {}
+                ),
+                svg
+            )
+        }
+        function t(x, y, s, a) {
+            return G.txt(
+                svg,
+                x,
+                y,
+                s,
+                Object.assign(
+                    { 'text-anchor': 'middle', 'font-size': 10.5 },
+                    a || {}
+                )
+            )
+        }
+        // hoverable part: rectangle plus tooltip text
+        function part(r, name, ns, where) {
+            r.style.cursor = 'default'
+            r.addEventListener('pointermove', function (ev) {
+                var b = root.getBoundingClientRect()
+                tip.style.display = 'block'
+                tip.style.left =
+                    Math.min(ev.clientX - b.left + 14, b.width - 260) + 'px'
+                tip.style.top = ev.clientY - b.top + 14 + 'px'
+                tip.innerHTML =
+                    '<b>' +
+                    name +
+                    '</b> · ' +
+                    where +
+                    '<br>~' +
+                    (ns < 1000 ? ns + ' ns' : ns / 1000 + ' µs') +
+                    ' ≈ ' +
+                    Number((ns / CYC).toPrecision(2)).toLocaleString('en-GB') +
+                    ' cycles<br>one cycle = one second: <b>' +
+                    human(ns) +
+                    '</b>'
+            })
+            r.addEventListener('pointerleave', function () {
+                tip.style.display = 'none'
+            })
+        }
+        // motherboard
+        G.el(
+            'rect',
+            {
+                x: 4,
+                y: 4,
+                width: 632,
+                height: 322,
+                rx: 10,
+                fill: 'none',
+                stroke: 'var(--muted)',
+                'stroke-dasharray': '6 4',
+            },
+            svg
+        )
+        G.txt(svg, 14, 318, 'motherboard', {
+            'font-size': 10,
+            fill: 'var(--muted)',
+        })
+        // CPU package
+        box(20, 20, 300, 262, 'var(--s1)', 0.05, {
+            rx: 8,
+            'stroke-opacity': 0.7,
+        })
+        t(170, 37, 'CPU package (one chip)', {
+            'font-size': 12,
+            'font-weight': 600,
+        })
+        // one core, opened up
+        box(32, 46, 172, 166, 'var(--s1)', 0.08, { rx: 6 })
+        t(118, 61, 'one core', { 'font-size': 11, 'font-weight': 600 })
+        box(42, 70, 92, 38, 'var(--muted)', 0.3)
+        t(88, 87, 'arithmetic')
+        t(88, 100, 'units')
+        part(
+            box(142, 70, 52, 38, 'var(--s1)', 0.55),
+            'Registers',
+            0.33,
+            'inside the core, wired to the arithmetic'
+        )
+        t(168, 86, 'registers', { 'font-size': 10 })
+        t(168, 100, '0.3 ns', { 'font-size': 9.5 })
+        part(
+            box(42, 116, 152, 40, 'var(--s1)', 0.35),
+            'L1 cache',
+            1.3,
+            'inside each core'
+        )
+        t(118, 133, 'L1 cache · tens of KB')
+        t(118, 147, '1.3 ns', { 'font-size': 9.5 })
+        part(
+            box(42, 164, 152, 40, 'var(--s1)', 0.22),
+            'L2 cache',
+            4,
+            'beside each core'
+        )
+        t(118, 181, 'L2 cache · ~1 MB')
+        t(118, 195, '4 ns', { 'font-size': 9.5 })
+        // the other cores
+        box(214, 46, 94, 78, 'var(--s1)', 0.08, { rx: 6 })
+        t(261, 80, 'core')
+        t(261, 95, '(own registers,', { 'font-size': 9.5 })
+        t(261, 107, 'L1 and L2)', { 'font-size': 9.5 })
+        box(214, 134, 94, 78, 'var(--s1)', 0.08, { rx: 6 })
+        t(261, 177, 'more cores …')
+        // shared L3
+        part(
+            box(32, 222, 276, 40, 'var(--s1)', 0.15),
+            'L3 cache',
+            15,
+            'shared by all cores on the chip'
+        )
+        t(170, 239, 'L3 cache, shared by all cores · tens of MB')
+        t(170, 253, '15 ns', { 'font-size': 9.5 })
+        // main memory
+        part(
+            box(380, 20, 240, 66, 'var(--s2)', 0.15, { 'stroke-opacity': 0.7 }),
+            'Main memory (DRAM)',
+            90,
+            'separate chips on the board'
+        )
+        for (var i = 0; i < 8; i++)
+            box(392 + i * 28, 52, 20, 12, 'var(--s2)', 0.35, {
+                rx: 1,
+                'pointer-events': 'none',
+            })
+        t(500, 40, 'main memory (DRAM modules)', {
+            'font-size': 11.5,
+            'font-weight': 600,
+        })
+        t(500, 79, 'GB–TB · 90 ns', { 'font-size': 9.5 })
+        G.el(
+            'path',
+            {
+                d: 'M320,44 H380 M320,62 H380',
+                stroke: 'var(--s2)',
+                'stroke-width': 2.5,
+                fill: 'none',
+            },
+            svg
+        )
+        t(350, 80, 'memory', { 'font-size': 9.5 })
+        t(350, 91, 'channels', { 'font-size': 9.5 })
+        // PCI Express to the GPU and the SSD
+        G.el(
+            'path',
+            {
+                d: 'M320,200 H350 M350,160 V262 M350,160 H380 M350,262 H380',
+                stroke: 'var(--s2)',
+                'stroke-width': 2.5,
+                fill: 'none',
+            },
+            svg
+        )
+        G.txt(svg, 364, 212, 'PCI Express', {
+            'text-anchor': 'middle',
+            'font-size': 9.5,
+            transform: 'rotate(-90 364 212)',
+        })
+        part(
+            box(380, 106, 240, 112, 'var(--s2)', 0.1, {
+                'stroke-opacity': 0.7,
+            }),
+            'GPU card',
+            5000,
+            'a small transfer from the CPU over PCIe'
+        )
+        t(500, 122, 'GPU card', { 'font-size': 11.5, 'font-weight': 600 })
+        box(394, 130, 104, 52, 'var(--muted)', 0.3, {
+            'pointer-events': 'none',
+        })
+        t(446, 160, 'GPU chip', { 'pointer-events': 'none' })
+        for (var j = 0; j < 4; j++)
+            box(508 + j * 26, 130, 20, 52, 'var(--s2)', 0.35, {
+                rx: 2,
+                'pointer-events': 'none',
+            })
+        t(559, 195, 'its own memory (HBM)', { 'font-size': 9.5 })
+        t(500, 211, 'small transfer from the CPU: ~5 µs', { 'font-size': 9.5 })
+        part(
+            box(380, 236, 240, 50, 'var(--s2)', 0.1, { 'stroke-opacity': 0.7 }),
+            'SSD read',
+            100000,
+            'storage, over PCIe'
+        )
+        t(500, 256, 'SSD (storage)', { 'font-size': 11.5, 'font-weight': 600 })
+        t(500, 273, 'TB · ~100 µs per read', { 'font-size': 9.5 })
+        t(
+            320,
+            304,
+            'schematic, not to scale · times are rounded orders of magnitude for a 3 GHz core',
+            { 'font-size': 9.5, opacity: 0.75 }
+        )
+    }
+)
